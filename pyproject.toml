@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "email-triage-env"
+version = "1.0.0"
+description = "Email Triage Agent Environment for OpenEnv Hackathon"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "openai",
+    "requests",
+    "scikit-learn",
+    "numpy",
+    "pytest"
+]
