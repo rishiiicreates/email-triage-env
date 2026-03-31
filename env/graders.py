@@ -158,7 +158,10 @@ def grade_triage_and_reply(
     tone_avg = sum(tone_scores) / len(tone_scores) if tone_scores else 0.0
 
     # Weighted sum
-    raw_score = 0.3 * urgency_score + 0.4 * reply_score + 0.3 * tone_avg
+    weights = {"urgency": 0.3, "reply": 0.4, "tone": 0.3}
+    assert abs(sum(weights.values()) - 1.0) < 1e-6
+    
+    raw_score = weights["urgency"] * urgency_score + weights["reply"] * reply_score + weights["tone"] * tone_avg
     final_score = max(0.0, min(1.0, raw_score - empty_penalty))
 
     partials = {
@@ -251,11 +254,14 @@ def grade_full_triage_pipeline(
     pii_recall = pii_flagged / len(pii_emails) if pii_emails else 1.0
 
     # Weighted sum
+    weights = {"classification": 0.25, "routing": 0.30, "reply": 0.25, "pii": 0.20}
+    assert abs(sum(weights.values()) - 1.0) < 1e-6
+    
     score = (
-        0.25 * classify_score
-        + 0.30 * route_score
-        + 0.25 * reply_score
-        + 0.20 * pii_recall
+        weights["classification"] * classify_score
+        + weights["routing"] * route_score
+        + weights["reply"] * reply_score
+        + weights["pii"] * pii_recall
     )
     score = max(0.0, min(1.0, score))
 

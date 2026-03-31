@@ -24,6 +24,18 @@ The environment scales naturally from simple classification to complex multi-ste
 
 ---
 
+## 📊 Baseline Scores (Qwen/Qwen2.5-72B-Instruct)
+
+| Task | Score | Details |
+|------|-------|---------|
+| `classify_basic` | ~0.80 | High zero-shot accuracy |
+| `triage_and_reply` | ~0.10 | Model struggles to consistently write quality contextual text |
+| `full_triage_pipeline` | ~0.18 | Hard pipeline challenges baseline instruction models |
+
+*Run it yourself using `export HF_TOKEN="hf_..."` and `python inference.py`.*
+
+---
+
 ## 🔭 Observation Space (`EmailObservation`)
 
 | Field | Type | Description |

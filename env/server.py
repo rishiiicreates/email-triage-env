@@ -98,8 +98,13 @@ def step(action: EmailAction):
             status_code=400,
             detail="Environment not initialized. Call POST /reset first.",
         )
-    result = env.step(action)
-    return result
+    try:
+        result = env.step(action)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
 @app.get("/state")

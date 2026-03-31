@@ -7,7 +7,7 @@ OpenEnv interface contract between the environment and agents.
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 
 
 # ─── Core Email Model ────────────────────────────────────────────────
@@ -108,7 +108,7 @@ class EmailObservation(BaseModel):
 class EmailAction(BaseModel):
     """An action the agent takes on the current email."""
 
-    action_type: str = Field(
+    action_type: Literal["classify", "reply", "route", "archive", "flag"] = Field(
         ...,
         description='Action type: "classify", "reply", "route", "archive", or "flag"',
         examples=["classify"],

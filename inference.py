@@ -282,7 +282,11 @@ def main():
     scores = {}
 
     for task_id in TASK_IDS:
-        scores[task_id] = run_task(client, task_id)
+        try:
+            scores[task_id] = run_task(client, task_id)
+        except Exception as e:
+            print(f"  ERROR: Task {task_id} unhandled failure: {e}")
+            scores[task_id] = 0.0
 
     elapsed = time.time() - start_time
 
