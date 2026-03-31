@@ -70,7 +70,7 @@ def root():
 @app.post("/reset")
 def reset(
     task_id: str = Query(
-        ...,
+        "classify_basic",
         description="Task ID: classify_basic, triage_and_reply, or full_triage_pipeline",
     ),
 ):
