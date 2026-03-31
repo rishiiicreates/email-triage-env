@@ -2,7 +2,7 @@
 title: Email Triage Env
 emoji: 📬
 colorFrom: purple
-colorTo: teal
+colorTo: green
 sdk: docker
 tags: [openenv]
 pinned: false
@@ -10,107 +10,137 @@ pinned: false
 
 # 📬 Email Triage Agent Environment
 
-An **OpenEnv-compliant** environment where AI agents triage, classify, and respond to realistic email inboxes. Designed as a benchmark for evaluating agent decision-making on real-world productivity tasks.
+An **OpenEnv-compliant** environment where AI agents triage, classify, reply to, route, and flag realistic email inboxes. Designed as a benchmark for evaluating agent decision-making on real-world productivity tasks.
 
 ## Why Email Triage?
 
-Email triage is a universal, genuinely hard problem. It requires:
-- **Classification** — distinguishing spam from urgent production alerts
-- **Prioritization** — ranking emails by importance and time-sensitivity
-- **Composition** — drafting contextually appropriate replies
+Email triage is a universal, genuinely hard problem with immediate commercial value. It requires:
+- **Classification** — distinguishing spam from urgent production alerts (and spoofed phishing)
+- **Composition** — drafting contextually appropriate, professional replies
+- **Routing** — sending emails to the correct department (Engineering / Sales / HR)
+- **PII Detection** — flagging emails containing sensitive personal data
 
 The environment scales naturally from simple classification to complex multi-step reasoning, making it an ideal testbed for agent evaluation.
 
 ---
 
-## 🔭 Observation Space
-
-Each observation contains the current inbox state:
+## 🔭 Observation Space (`EmailObservation`)
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `emails` | `List[Email]` | List of emails to process |
-| `step_number` | `int` | Current step in the episode |
+| `inbox` | `List[Email]` | All emails in the inbox for this episode |
+| `current_email` | `Email` | The email currently being processed |
+| `step_count` | `int` | Current step in the episode |
 | `task_id` | `str` | Active task identifier |
-| `remaining_emails` | `int` | Number of unprocessed emails |
+| `context` | `dict` | Extra metadata (remaining count, task info) |
 
 Each **Email** has:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | `str` | Unique email identifier (e.g., `email_01`) |
-| `sender` | `str` | Sender email address |
+| `id` | `str` | Unique email identifier (e.g., `email_001`) |
+| `sender_name` | `str` | Display name of sender |
+| `sender_email` | `str` | Email address (may be spoofed) |
 | `subject` | `str` | Email subject line |
-| `body` | `str` | Full email body text |
+| `body` | `str` | Full email body text (3-8 sentences) |
+| `department` | `str` | Department tag: Engineering / Sales / HR |
 | `timestamp` | `str` | ISO 8601 timestamp |
 
 ---
 
-## 🎯 Action Space
-
-Each action processes one email:
+## 🎯 Action Space (`EmailAction`)
 
 | Field | Type | Valid Values | Description |
 |-------|------|-------------|-------------|
-| `email_id` | `str` | Any email ID from observation | Which email to process |
-| `label` | `str` | `"urgent"`, `"normal"`, `"spam"`, `"reply-needed"` | Classification label |
-| `priority` | `int` | `1` (highest) to `5` (lowest) | Priority ranking |
-| `draft_reply` | `str \| null` | Free-form text or null | Draft reply (required for `task_hard`) |
+| `action_type` | `str` | `"classify"`, `"reply"`, `"route"`, `"archive"`, `"flag"` | What to do |
+| `label` | `str?` | `"urgent"`, `"normal"`, `"spam"` | Classification label |
+| `reply_text` | `str?` | Free-form text | Draft reply content |
+| `route_to` | `str?` | `"Engineering"`, `"Sales"`, `"HR"` | Department to route to |
+| `reasoning` | `str?` | Free-form text | Agent's reasoning (logged, not graded) |
 
 ---
 
-## 📋 Task Descriptions
+## 📋 Tasks
 
-### Task 1: Classify Urgency (`task_easy`)
-**Difficulty:** Easy
+### Task 1: `classify_basic` (Easy)
+- **Inbox**: 10 emails (3 urgent, 4 normal, 3 spam)
+- **Goal**: Classify each email as urgent / normal / spam
+- **Grading**: Accuracy = correct_labels / total_emails (0.0–1.0)
+- **Max Steps**: 10
+- **Partial Reward**: +0.1 per correct classification
 
-Classify each of the 15 emails in the inbox as `urgent`, `normal`, `spam`, or `reply-needed`. The agent is scored solely on **exact-match accuracy** against pre-determined gold labels.
+### Task 2: `triage_and_reply` (Medium)
+- **Inbox**: 5 emails (2 urgent, 2 normal, 1 spam)
+- **Goal**: Classify all AND write short replies to the 2 urgent emails
+- **Grading** (weighted):
+  - Correct urgency detection: 0.3
+  - Reply relevance (cosine similarity vs reference): 0.4
+  - Tone appropriateness (keyword heuristic): 0.3
+  - Penalty: -0.2 for empty replies on urgent emails
+- **Max Steps**: 15
 
-**Grader:** `score = correct_labels / total_emails`
+### Task 3: `full_triage_pipeline` (Hard)
+- **Inbox**: 15 emails across Engineering, Sales, HR departments
+- **Goal**: Classify all, reply to urgent, route each to correct department, flag PII
+- **Grading** (weighted):
+  - Classification accuracy: 0.25
+  - Routing accuracy: 0.30
+  - Reply quality (top-3 urgent): 0.25
+  - PII flagging recall: 0.20
+- **Max Steps**: 25
 
 ---
 
-### Task 2: Label and Prioritize Inbox (`task_medium`)
-**Difficulty:** Medium
+## 📐 Reward Function Design
 
-Classify each email AND assign a priority ranking (1–5). The agent is evaluated on both its label accuracy and how well its priority ordering matches the gold standard.
+### Dense Step Rewards
+Every step returns a signal. Partial credit for partially correct actions.
 
-**Grader:** `score = 0.5 × label_accuracy + 0.5 × normalized_kendall_tau`
+| Condition | Reward |
+|-----------|--------|
+| Correct classification | +0.10 |
+| Correct routing | +0.10 |
+| Correct PII flag | +0.10 |
+| Reply quality (similarity + tone) | up to +0.20 |
+| Archive non-urgent | +0.03 |
+| Episode completion bonus (< 60% max steps) | +0.10 |
+
+### Penalties
+| Condition | Penalty |
+|-----------|---------|
+| Repeated action on same email (loop) | -0.15 |
+| Archive urgent email | -0.10 |
+| Empty reply on urgent email | -0.20 |
+| Reply under 10 characters | -0.05 |
 
 ---
 
-### Task 3: Triage and Draft Replies (`task_hard`)
-**Difficulty:** Hard
+## 🔌 API Endpoints
 
-Classify, prioritize, AND draft professional replies for emails labeled `urgent` or `reply-needed`. Reply quality is measured by keyword coverage against gold reply templates.
-
-**Grader:** `score = 0.3 × label_accuracy + 0.2 × rank_correlation + 0.5 × reply_keyword_coverage`
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check → `{"status": "ok"}` |
+| `/reset?task_id=...` | POST | Reset for new episode → `{observation}` |
+| `/step` | POST | Submit action → `{observation, reward, done, info}` |
+| `/state` | GET | Current state → `{state}` |
+| `/tasks` | GET | List available tasks |
 
 ---
 
-## ⚡ Setup Instructions
-
-### Prerequisites
-- Python 3.11+
-- Docker (for containerized deployment)
-- OpenAI API key (for baseline only)
+## ⚡ Setup
 
 ### Local Development
 
 ```bash
-# Clone the repository
-git clone <repo-url>
-cd email-triage-env
-
 # Install dependencies
 pip install -r requirements.txt
 
 # Start the server
-uvicorn server:app --host 0.0.0.0 --port 7860
+uvicorn env.server:app --host 0.0.0.0 --port 7860
 
-# Test the endpoints
-curl http://localhost:7860/tasks
-curl -X POST "http://localhost:7860/reset?task_id=task_easy"
+# Test endpoints
+curl http://localhost:7860/health
+curl -X POST "http://localhost:7860/reset?task_id=classify_basic"
 ```
 
 ### Docker
@@ -119,54 +149,37 @@ curl -X POST "http://localhost:7860/reset?task_id=task_easy"
 docker build -t email-triage-env .
 docker run -p 7860:7860 email-triage-env
 
-# Verify
-curl http://localhost:7860/tasks
+curl http://localhost:7860/health
 ```
 
 ### Run Baseline Agent
 
 ```bash
-export OPENAI_API_KEY=sk-...
-python baseline.py --verbose
+export HF_TOKEN=hf_...
+python inference.py
+```
+
+### Run Tests
+
+```bash
+pytest tests/ -v
 ```
 
 ---
 
-## 📊 Baseline Scores (gpt-4o-mini)
+## 📊 Synthetic Data
 
-| Task | Score | Details |
-|------|-------|---------|
-| `task_easy` | ~0.87 | Label accuracy |
-| `task_medium` | ~0.72 | 50% label acc + 50% rank corr |
-| `task_hard` | ~0.51 | 30% label + 20% rank + 50% reply |
+Emails are generated deterministically using seeded random generation. Categories include:
 
----
+- **Password reset / security alerts** (some from spoofed domains like `paypa1.com`, `c0mpany.com`)
+- **Meeting requests and calendar changes**
+- **Client complaints and contract renewals**
+- **Spam** (lottery scams, phishing, crypto schemes)
+- **HR policy updates and compliance**
+- **Code review requests and infrastructure alerts**
+- **PII-containing emails** (SSNs, phone numbers, personal emails, bank details)
 
-## 🔌 API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/tasks` | GET | List all available tasks with action schemas |
-| `/reset?task_id=...` | POST | Reset environment for a new episode |
-| `/step` | POST | Submit an action, get observation + reward |
-| `/state` | GET | Get current environment state |
-| `/grader` | POST | Grade a complete episode log |
-| `/baseline` | GET | Baseline agent information |
-
----
-
-## 📐 Reward Shaping
-
-Per-step rewards provide learning signal during episodes:
-
-| Condition | Reward |
-|-----------|--------|
-| Correct label | +0.3 |
-| Correct priority (exact) | +0.2 |
-| Close priority (±1) | +0.1 |
-| Reply keyword coverage | +0.5 × coverage |
-| Misclassify urgent as spam | −0.2 |
-| Missing required reply | −0.1 |
+All data generation uses `random.seed(task_seed)` for full reproducibility.
 
 ---
 

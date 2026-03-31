@@ -1,14 +1,16 @@
 name: email-triage-env
 version: "1.0.0"
-description: "An environment where agents triage, classify, and respond to realistic email inboxes."
-tags: [openenv, email, triage, nlp, productivity]
+description: "AI email triage: classify, reply, route, and flag emails"
+tags: [openenv, email, nlp, triage, real-world]
 tasks:
-  - id: task_easy
-    name: "Classify urgency"
+  - id: classify_basic
     difficulty: easy
-  - id: task_medium
-    name: "Label and prioritize inbox"
+    max_steps: 10
+  - id: triage_and_reply
     difficulty: medium
-  - id: task_hard
-    name: "Triage and draft replies"
+    max_steps: 15
+  - id: full_triage_pipeline
     difficulty: hard
+    max_steps: 25
+action_space: EmailAction
+observation_space: EmailObservation
