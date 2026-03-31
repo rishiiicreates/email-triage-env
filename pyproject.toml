@@ -16,5 +16,9 @@ dependencies = [
     "requests",
     "scikit-learn",
     "numpy",
-    "pytest"
+    "pytest",
+    "openenv-core>=0.2.0"
 ]
+
+[project.scripts]
+server = "server.app:run"

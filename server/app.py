@@ -12,14 +12,14 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from .models import (
+from env.models import (
     EmailAction,
     ResetResponse,
     StepResponse,
     StateResponse,
 )
-from .environment import EmailTriageEnv
-from .tasks import TASK_REGISTRY, get_task_ids
+from env.environment import EmailTriageEnv
+from env.tasks import TASK_REGISTRY, get_task_ids
 
 app = FastAPI(
     title="Email Triage Agent Environment",
@@ -142,7 +142,9 @@ def list_tasks():
     return {"tasks": tasks}
 
 
-if __name__ == "__main__":
+def run():
     import uvicorn
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
 
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+if __name__ == "__main__":
+    run()
